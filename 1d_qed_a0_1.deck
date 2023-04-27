@@ -1,0 +1,99 @@
+begin:constant 
+ t_sim = 50.0 * 1.0e-6 / c
+end:constant
+
+begin:control
+ nx = 3840
+ t_end = t_sim
+ x_min = 0.0 
+ x_max = 30.0e-6
+ dt_multiplier = 0.95
+ field_order = 2
+ maxwell_solver = yee
+ use_random_seed = T
+ particle_tstart = (29 / 50) * t_sim
+ dlb_threshold = 0.6
+end:control
+
+begin:boundaries
+ bc_x_min = simple_laser
+ bc_x_max = simple_laser
+end:boundaries
+
+begin:constant 
+ a0 = 100.0 # or = 1, 10, 100, 270
+ omega_r = 2.0 * pi * c / (1.0e-6)
+ intensity = (a0/0.86)^2 * 1.0e18
+ width = (t_sim * 0.2) / ( 2 * (loge(2))^(1/4))
+end:constant
+
+begin:laser
+ boundary = x_min
+ intensity_w_cm2 = intensity/2
+ omega = omega_r
+ pol_angle = 0
+ phase = 0
+ t_profile = supergauss(time, t_sim * 0.5, width, 4)
+ t_start = 0.0
+ t_end = t_sim
+end:laser
+
+begin:qed
+ use_qed = T
+ qed_start_time = 0.0
+ produce_photons = T
+ photon_energy_min = 0.0
+ photon_dynamics = F
+ produce_pairs = F
+ use_radiation_reaction = T
+end:qed
+
+begin:constant
+ gamma = 1000.0 / 0.511
+ drift = gamma * me * c * sqrt(1 - (1.0/((gamma)^2)) )
+ n_0 = 1.0e-5
+ omega_r = 2 * pi * c / 1.0e-6
+ density_0 = n_0 * critical(omega_r)
+ l_x = 30
+ d_x = 1.0 / 128.0
+ x_left = (l_x - 10 * d_x) * 1e-6
+ x_right = (l_x - d_x) * 1e-6
+end:constant
+
+begin:species
+ name = electron
+ npart_per_cell = 64
+ temp = 0.0
+ drift_x = -drift
+ number_density = if((x gt x_left) and (x lt x_right),density_0,0.0)
+ identify:electron 
+end:species
+
+begin:species
+ name = photon
+ nparticles = 0
+ identify:photon
+end:species
+
+begin:constant
+ every = 10
+ cfl = 0.95
+ res = 128
+ snapshot_diag = every * cfl * 1.0e-6 / (c * res)
+end:constant
+
+begin:output
+ nstep_snapshot = 10
+ charge_density = always
+ grid = always
+ ey = always
+ ex = always
+ ez = always
+ particles = always
+ particle_energy = always + species
+ particle_weight = always + species
+ px = always + species
+ py = always + species
+ pz = always + species
+ total_energy_sum = always + species
+end:output
