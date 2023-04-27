@@ -21,7 +21,7 @@ begin:boundaries
 end:boundaries
 
 begin:constant 
- a0 = 100.0 # or = 1, 10, 100, 270
+ a0 = 100.0
  omega_r = 2.0 * pi * c / (1.0e-6)
  intensity = (a0/0.86)^2 * 1.0e18
  width = (t_sim * 0.2) / ( 2 * (loge(2))^(1/4))
