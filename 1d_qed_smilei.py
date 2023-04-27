@@ -51,7 +51,7 @@ Main(
 # Laser definition
 LaserPlanar1D(
     box_side         = "xmin",
-    a0              = 100.,
+    a0              = 100., # = 1., 10., 270.,
     omega           = 1.,
     polarization_phi = 0.,
     ellipticity     = 1,
