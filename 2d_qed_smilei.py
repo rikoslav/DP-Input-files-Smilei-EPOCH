@@ -1,112 +1,160 @@
-begin:constant
- t_sim = 60.0 * 1.0e-6 / c
- omega_r = 2.0 * pi * c / 1.0e-6
-end:constant
+from math import pi, sqrt
 
-begin:control
- nx = 1920
- ny = 256
- t_end = t_sim
- x_min = 0.0
- x_max = 30.0e-6
- y_min = -2.0e-6
- y_max = 2.0e-6
- dt_multiplier = 0.95
- field_order = 2
- maxwell_solver = yee
- use_random_seed = T
- particle_tstart = (29.0 / 60) * t_sim
- dlb_threshold = 0.6
-end:control
+c = 299792458
+lambdar = 1e-6
+wr = 2*pi*c/lambdar
 
-begin:boundaries
-  bc_x_min = simple_laser
-  bc_x_max = simple_laser
-  bc_y_max = periodic
-  bc_y_min = periodic
-end:boundaries
+l0 = 2.0*pi              # laser wavelength
+t0 = l0                       # optical cicle
+Lx = 30*l0                    # Longitudinal length
+Ly = 4*l0                     # Transverse length
 
-begin:constant
-  a0 = 100.0 # 1., 10., 270.,
-  w0 = 1000 / (2 * pi)    
-  I_peak_Wcm2 = (a0/0.86)^2 * 1.0e18
-  las_lambda = 1.0e-6      
-  foc_dist = 15.0e-6        
-  width = t_sim / (6* 2 * (loge(2))^(1/4))
-end:constant
+n0 = 1e-5                     # particle density
 
-begin:constant
- las_k = 2.0 * pi / las_lambda    
- ray_rang = pi * w0^2 / las_lambda                   
- w_boundary = w0 * sqrt(1.0 + (foc_dist/ray_rang)^2)  
- I_boundary = I_peak_Wcm2 * (w0 / w_boundary)^2       
- rad_curve = foc_dist * (1.0 + (ray_rang/foc_dist)^2) 
- gouy = atan(-foc_dist/rad_curve)                     
-end:constant
+Tsim = 60.*t0                 # duration of the simulation
+resx = 64.                    # nb of cells in one laser wavelength
+resy = 64.
 
-begin:laser
-    boundary = x_min
-    intensity_w_cm2 = I_boundary
-    lambda = las_lambda
-    phase = las_k * y^2 / (2.0 * rad_curve) - gouy
-    profile = gauss(y, 0, w_boundary)
-    pol_angle = 0
-    t_profile = supergauss(time, (50.0/(60.0*2)) * t_sim, width, 4)
-    t_start = 0.0
-    t_end = (50.0/60.0) * t_sim
-end:laser
+dx = l0/resx                            # space step
+dy = l0/resy
+dt  = 0.95 * 1./np.sqrt(1./dx**2 + 1./dy**2)         # timestep (0.95 x CFL)
 
-begin:qed
- use_qed = T
- qed_start_time = 0.0
- produce_photons = T
- photon_energy_min = 0.0
- photon_dynamics = F
- produce_pairs = F
- use_radiation_reaction = T
-end:qed
+start = 0                               # Laser start
+fwhm = 10*t0                            # Gaussian time fwhm
+duration = 50*t0                        # Laser duration
+center = duration*0.5                   # Laser profile center
+order = 4                               # Laser order
 
-begin:constant
- gamma = 1000.0 / 0.511
- drift = gamma * me * c * sqrt(1 - (1.0/((gamma)^2)) )
- n_0 = 1.0e-5
- density_0 = n_0 * critical(omega_r)
- l_x = 30.0
- x_left = 0.97 * l_x * 1e-6
- x_right = 0.99 * l_x * 1e-6
- l_y = 2.0
- y_abs = (2/50) * l_y * 1e-6
-end:constant
+gamma = 1000./0.511                     # Electron beam gamma factor
+v = sqrt(1 - 1./gamma**2)          # electron beam initial velocity
 
-begin:species
- name = electron
- npart_per_cell = 32
- temp = 0.0
- drift_x = -drift
- number_density = if( (x gt x_left) and (x lt x_right) 
-                    and (abs(y) lt y_abs), density_0, 0.0)
- identify:electron 
-end:species
+def n0_electron(x,y):
+        if ((0.97*Lx < x < 0.99*Lx)and(0.48*Ly < y < 0.52*Ly)):
+                return n0
+        else:
+                return 0.
 
-begin:species
- name = photon
- nparticles = 0
- identify:photon
-end:species
+Main(
+    geometry = "2Dcartesian",
 
-begin:output
- nstep_snapshot = 10
- poynt_flux = always
- charge_density = always
- grid = always
- ey = always
- ex = always
- ez = always
- particles = always
- particle_energy = always + species
- particle_weight = always + species
- px = always + species
- py = always + species
- pz = always + species
- total_energy_sum = always + species
-end:output
+    interpolation_order = 4 ,
+
+    cell_length = [dx,dy],
+    grid_length  = [Lx,Ly],
+
+    number_of_patches = [4,4],
+
+    timestep = dt,
+    simulation_time = Tsim,
+
+    EM_boundary_conditions = [
+        ["silver-muller", "silver-muller"],
+        ["periodic", "periodic"]
+    ],
+
+    reference_angular_frequency_SI = wr,
+
+    random_seed = 0
+
+)
+
+LaserGaussian2D(
+    box_side         = "xmin",
+    a0              = 100.,
+    omega           = 1.,
+    focus           = [0.5*Lx, 0.5*Ly],
+    waist           = 1E9,
+    incidence_angle = 0.,
+    polarization_phi = 0.,
+    ellipticity     = 0,
+    time_envelope  = tgaussian(start=start,duration=duration,
+                               fwhm=fwhm,
+                               center=center,
+                               order=order)
+)
+
+Species(
+    name = "electron",
+    position_initialization = "random",
+    momentum_initialization = "cold",
+    particles_per_cell = 32,
+    #c_part_max = 1.,
+    mass = 1.0,
+    charge = -1.0,
+    charge_density = n0_electron,
+    mean_velocity = [-v, 0.0, 0.0],
+    temperature = [0.],
+    pusher = "boris", #zmena z vay
+    radiation_model = "Monte-Carlo",
+    time_frozen = 29*t0,
+    boundary_conditions = [["remove","remove"],
+                            ["periodic","periodic"]]
+)
+
+RadiationReaction(
+    minimum_chi_continuous = 1e-4,
+    minimum_chi_discontinuous = 1e-4,
+)
+
+DiagScalar(
+    every = 10,
+    vars=['Uelm','Ukin','Utot','Uexp','Ubal','Urad',
+          'Ukin_electron',
+          'Ntot_electron']
+)
+
+DiagFields(
+    every = 500,
+    fields = ['Ex','Ey','Ez','By','Bz']
+)
+
+# 1. 2D grid of the weight
+DiagParticleBinning(
+    deposited_quantity = "weight",
+    every = 500,
+    time_average = 1,
+    species = ["electron"],
+    axes = [
+        ["x", 0., Lx, 1000],
+        ["y", 0., Ly, 1000]
+    ]
+)
+
+
+# 2. 2D grid of the weight x normalized kinetic energy (gamma factor - 1)
+DiagParticleBinning(
+    deposited_quantity = "weight_ekin",
+    every = 500,
+    time_average = 1,
+    species = ["electron"],
+    axes = [
+        ["x", 0., Lx, 1000],
+        ["y", 0., Ly, 1000]
+    ]
+)
+
+
+# 3. Quantum parameter x weight
+# Quantum parameter particle binning can be switched off if no radiation losses
+DiagParticleBinning(
+    deposited_quantity = "weight_chi",
+    every = 500,
+    time_average = 1,
+    species = ["electron"],
+    axes = [
+        ["x", 0., Lx, 1000],
+        ["y", 0., Ly, 1000]
+    ]
+)
+
+# 4. Energy distributions
+DiagParticleBinning(
+    deposited_quantity = "weight",
+    every = 500,
+    time_average = 1,
+    species = ["electron"],
+    axes = [
+        ["gamma", 10., 3000, 200,'logscale']
+    ]
+)
+
