@@ -123,8 +123,8 @@ Species(
 )
 
 RadiationReaction(
-    minimum_chi_continuous = 1e-4,
-    minimum_chi_discontinuous = 1e-4,
+    minimum_chi_continuous = 1e-5,
+    minimum_chi_discontinuous = 1e-5,
 )
 
 MultiphotonBreitWheeler(
