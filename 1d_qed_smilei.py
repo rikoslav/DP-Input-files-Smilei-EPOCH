@@ -83,6 +83,7 @@ for i,radiation in enumerate(radiation_list):
 
 # Radiation parameters
 RadiationReaction(
+    minimum_chi_continuous = 1e-5,
     minimum_chi_discontinuous = 1e-5,
 )
 
